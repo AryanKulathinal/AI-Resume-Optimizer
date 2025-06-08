@@ -1,20 +1,28 @@
-import { Injectable, InternalServerErrorException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  InternalServerErrorException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { UsersService } from '../../../services/user-service/src/users/users.service';
+import { ClientProxy } from '@nestjs/microservices';
 import * as bcrypt from 'bcryptjs';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private usersService: UsersService,
-    private jwtService: JwtService,
+    @Inject('USER_SERVICE') private readonly userClient: ClientProxy,
+    private readonly jwtService: JwtService,
   ) {}
 
   async validateUser(username: string, pass: string): Promise<any> {
     try {
-      const user = await this.usersService.findByUsername(username);
+      const user = await firstValueFrom(
+        this.userClient.send({ cmd: 'get-user-by-username' }, username),
+      );
       if (user && (await bcrypt.compare(pass, user.password))) {
         const { password, ...result } = user;
         return result;
@@ -29,7 +37,11 @@ export class AuthService {
   async login(loginDto: LoginDto) {
     try {
       const { username, password } = loginDto;
-      const user = await this.usersService.findByUsername(username);
+
+      const user = await firstValueFrom(
+        this.userClient.send({ cmd: 'get-user-by-username' }, username),
+      );
+
       if (!user || !(await bcrypt.compare(password, user.password))) {
         throw new BadRequestException('Invalid credentials');
       }
@@ -48,17 +60,23 @@ export class AuthService {
     try {
       const { name, username, password } = registerDto;
 
-      const existingUser = await this.usersService.findByUsername(username).catch(() => null);
+      const existingUser = await firstValueFrom(
+        this.userClient.send({ cmd: 'get-user-by-username' }, username),
+      ).catch(() => null);
+
       if (existingUser) {
         throw new BadRequestException(`Username "${username}" is already taken.`);
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
-      await this.usersService.create({
-        name,
-        username,
-        password: hashedPassword,
-      });
+
+      await firstValueFrom(
+        this.userClient.send({ cmd: 'create-user' }, {
+          name,
+          username,
+          password: hashedPassword,
+        }),
+      );
 
       return { message: 'Registration successful' };
     } catch (err) {

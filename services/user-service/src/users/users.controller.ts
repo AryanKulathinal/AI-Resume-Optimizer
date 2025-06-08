@@ -33,6 +33,11 @@ export class UsersController {
     return this.usersService.remove(id);
   }
 
+  @MessagePattern({ cmd: 'get-user-by-username' })
+  findByUsername(@Payload() username: string) {
+    return this.usersService.findByUsername(username);
+  }
+
   // === Skills Endpoints ===
 
   @MessagePattern({ cmd: 'get-skills' })
