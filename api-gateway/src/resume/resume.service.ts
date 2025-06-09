@@ -12,16 +12,35 @@ export class ResumeService {
     userId: number,
     resumePdfBase64: string,
     jobDetails: string,
-  ): Promise<{ optimizedPdfBase64: string }> {
+  ): Promise<{ converted: string }> {
     try {
       const payload = { userId, resumePdfBase64, jobDetails };
       const result = await firstValueFrom(
         this.resumeClient.send('optimizeResume', payload),
       );
+      
       return result;
     } catch (error) {
       console.error('Gateway error:', error);
       throw new InternalServerErrorException('Resume optimization failed');
+    }
+  }
+
+  async scoreResume(
+    userId: number,
+    resumePdfBase64: string,
+    jobDetails: string,
+  ): Promise<{ score: number; comments: string }> {
+    try {
+      const payload = { userId, resumePdfBase64, jobDetails };
+      const result = await firstValueFrom(
+        this.resumeClient.send('scoreResume', payload),
+      );
+      
+      return result;
+    } catch (error) {
+      console.error('Gateway error:', error);
+      throw new InternalServerErrorException('Resume scoring failed');
     }
   }
 }

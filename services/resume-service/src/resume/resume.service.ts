@@ -76,24 +76,27 @@ export class ResumeService {
     }
   }
 
-  async scoreResume(
-    userId: number,
-    resumePdfBase64: string,
-    jobDetails: string,
-  ): Promise<{ score: number; comments: string[] }> {
+  async scoreResume(userId: number, resumePdfBase64: string, jobDetails: string): Promise<{ score: number; comments: string }> {
     try {
-      const result = await this.aiClient
-        .send('scoreResume', {
-          userId,
-          resumePdfBase64,
-          jobDescription: jobDetails,
-        })
-        .toPromise();
-
+      const payload = { userId, resumePdfBase64, jobDescription: jobDetails };
+      const result = await firstValueFrom(this.aiClient.send('scoreResume', payload));
+  
+    
+      const scoreEntity = this.resumeRepository.create({
+        userId,
+        jobDetails:jobDetails,
+        score: result.score,
+        comments: result.comments,
+        createdAt: new Date(),
+      });
+  
+      await this.resumeRepository.save(scoreEntity);
+  
       return result;
     } catch (error) {
-      console.error('Error scoring resume:', error);
-      throw new InternalServerErrorException('Failed to score resume');
+      console.error('Failed to score resume:', error);
+      throw new InternalServerErrorException('Resume scoring failed');
     }
   }
+  
 }

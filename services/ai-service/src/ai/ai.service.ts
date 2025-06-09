@@ -12,6 +12,8 @@ import { UpdateContextDto } from './dto/update-context.dto';
 import { GeminiService } from './gemini.service';
 import * as pdfParse from 'pdf-parse';
 import { OptimizeResumeDto } from './dto/optimize-resume.dto';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { ScoreResumeDto } from './dto/score-resume.dto';
 
 @Injectable()
 export class AiService {
@@ -83,6 +85,66 @@ export class AiService {
     return result;
   }
 
+  async  generatePdfFromText(text: string): Promise<Buffer> {
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.TimesRoman);
+  
+    const fontSize = 12;
+    const lineHeight = fontSize + 4;
+    const margin = 50;
+    const pageWidth = 595.28;
+    const pageHeight = 841.89;
+    const maxWidth = pageWidth - 2 * margin;
+  
+    const paragraphs = text.split('\n');
+    let lines: string[] = [];
+  
+    // Word-wrap each paragraph
+    for (const para of paragraphs) {
+      const words = para.split(' ');
+      let currentLine = '';
+  
+      for (const word of words) {
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
+        const testWidth = font.widthOfTextAtSize(testLine, fontSize);
+  
+        if (testWidth < maxWidth) {
+          currentLine = testLine;
+        } else {
+          lines.push(currentLine);
+          currentLine = word;
+        }
+      }
+      if (currentLine) lines.push(currentLine);
+  
+      // Add empty line for paragraph break
+      lines.push('');
+    }
+  
+    let page = pdfDoc.addPage([pageWidth, pageHeight]);
+    let y = pageHeight - margin;
+  
+    for (const line of lines) {
+      if (y < margin + lineHeight) {
+        page = pdfDoc.addPage([pageWidth, pageHeight]);
+        y = pageHeight - margin;
+      }
+  
+      if (line !== '') {
+        page.drawText(line, {
+          x: margin,
+          y,
+          size: fontSize,
+          font,
+          color: rgb(0, 0, 0),
+        });
+      }
+      y -= lineHeight;
+    }
+  
+    const pdfBytes = await pdfDoc.save();
+    return Buffer.from(pdfBytes);
+  }
   async optimizeResume({ resumePdfBase64, jobDescription }: OptimizeResumeDto) {
     // Decode base64 PDF
     const resumeBuffer = Buffer.from(resumePdfBase64, 'base64');
@@ -94,8 +156,19 @@ export class AiService {
       resumeText,
       jobDescription,
     );
-    return {
-      optimizedResume,
-    };
+    const pdfBuffer = await this.generatePdfFromText(optimizedResume) 
+    const converted = pdfBuffer.toString('base64');
+    return { converted };
   }
+
+  async scoreResume({ resumePdfBase64, jobDescription }: ScoreResumeDto): Promise<{ score: number; comments: string[] }> {
+    const resumeBuffer = Buffer.from(resumePdfBase64, 'base64');
+    const parsed = await pdfParse(resumeBuffer);
+    const resumeText = parsed.text;
+  
+    const result = await this.geminiService.scoreResumeText(resumeText, jobDescription);
+  
+    return result;
+  }
+ 
 }

@@ -58,9 +58,9 @@ export class GeminiService {
     jobDescription: string,
   ): Promise<string> {
     const prompt = `
-    You are a professional resume writer.
-    Based on the following job description and current resume content, rewrite the resume to better match the job while keeping it concise and professional.
-    Only return the optimized resume as plain text. Do not add explanations or formatting hints. Also try to follow the structure of the current resume.
+   You are a professional resume writer. Optimize the given resume to better align with the provided job description,
+   keeping it concise, detailed, and professional without unnecessary fillers. Preserve the original structure and
+   content length without significant reduction. Return only the optimized resume.
     ---
     Job Description:${jobDescription}
     ---
@@ -80,6 +80,56 @@ export class GeminiService {
     );
     const output =
       response.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
     return output;
+  }
+
+  async scoreResumeText(
+    resumeText: string,
+    jobDescription: string,
+  ): Promise<{ score: number; comments: string[] }> {
+    const prompt = `
+    You're an expert resume reviewer. Given the resume text and job description below,
+    give a score out of 100 for how well the resume matches the job, and provide suggestions for improvement.
+  
+    Resume: """${resumeText}"""
+  
+  Job Description:
+  """
+  ${jobDescription}
+  """
+  
+  Respond in JSON format as:
+  {
+    "score": number,
+    "comments": a descriptive text on how the resume can improve based on the job description
+  }
+    `.trim();
+
+    const response = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`,
+      {
+        contents: [
+          {
+            parts: [{ text: prompt }],
+          },
+        ],
+      },
+      {
+        headers: { 'Content-Type': 'application/json' },
+      },
+    );
+
+    const outputText =
+      response.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    try {
+      const cleaned = outputText.replace(/```(?:json)?|```/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+      return parsed;
+    } catch (err) {
+      console.error('Failed to parse score output:', outputText);
+      throw new Error('Invalid JSON response from Gemini');
+    }
   }
 }

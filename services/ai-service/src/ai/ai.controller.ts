@@ -5,6 +5,7 @@ import { CreateAiDto } from './dto/create-ai.dto';
 import { UpdateAiDto } from './dto/update-ai.dto';
 import { UpdateContextDto } from './dto/update-context.dto';
 import { OptimizeResumeDto } from './dto/optimize-resume.dto';
+import { ScoreResumeDto } from './dto/score-resume.dto';
 
 @Controller()
 export class AiController {
@@ -43,5 +44,10 @@ export class AiController {
   @MessagePattern('optimizeResume')
   async optimizeResume(@Payload() optimizeDto: OptimizeResumeDto) {
     return this.aiService.optimizeResume(optimizeDto);
+  }
+
+  @MessagePattern('scoreResume')
+  async scoreResume(@Payload() scoreDto: ScoreResumeDto) {
+    return this.aiService.scoreResume(scoreDto);
   }
 }

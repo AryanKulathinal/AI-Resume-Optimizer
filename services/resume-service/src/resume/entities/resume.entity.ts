@@ -6,7 +6,7 @@ export class Resume {
   id: number;
 
   @Column()
-  name: string; 
+  userId: number;
 
   @Column('text')
   jobDetails: string; 
@@ -14,9 +14,10 @@ export class Resume {
   @Column({ type: 'float', nullable: true })
   score: number; 
 
+  @Column('text')
+  comments: string; 
+
   @CreateDateColumn()
   createdAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
-  uploadedAt: Date; 
 }
